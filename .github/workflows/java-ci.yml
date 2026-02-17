@@ -55,8 +55,5 @@ jobs:
             echo "Loading new Docker image..."
             sudo docker load -i /home/ec2-user/app.tar
 
-            echo "Running new container..."
-            sudo docker run -d \
-              -p 8080:8080 \
-              --restart unless-stopped \
-              --name springboot
+            sudo docker run -d -p 8080:8080 --restart unless-stopped --name springboot-app springboot-tomcat-app
+
