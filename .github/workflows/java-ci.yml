@@ -10,58 +10,53 @@ jobs:
 
     steps:
 
-    # 1️⃣ Checkout Code
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      # 1️⃣ Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # 2️⃣ Build Docker Image
-    - name: Build Docker Image
-      run: |
-        docker build -t springboot-tomcat-app .
+      # 2️⃣ Build Docker Image
+      - name: Build Docker Image
+        run: docker build -t springboot-tomcat-app .
 
-    # 3️⃣ Save Docker Image as TAR
-    - name: Save Docker Image
-      run: |
-        docker save springboot-tomcat-app -o app.tar
+      # 3️⃣ Save Docker Image
+      - name: Save Docker Image
+        run: docker save springboot-tomcat-app -o app.tar
 
-    # 4️⃣ Copy TAR to EC2
-    - name: Copy Docker Image to EC2
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_KEY }}
-        source: "app.tar"
-        target: "/home/ec2-user"
+      # 4️⃣ Copy TAR to EC2
+      - name: Copy Docker Image to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "app.tar"
+          target: "/home/ec2-user"
 
-    # 5️⃣ SSH to EC2 and Deploy
-    - name: Deploy on EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_KEY }}
-       script: |
+      # 5️⃣ SSH and Deploy
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "Installing Docker if not installed..."
+            sudo yum update -y
+            sudo yum install docker -y || true
 
-        echo "Installing Docker if not installed..."
-        sudo yum update -y
-        sudo yum install docker -y || true
+            echo "Starting Docker..."
+            sudo systemctl start docker
+            sudo systemctl enable docker
 
-        echo "Starting Docker..."
-        sudo systemctl start docker
-        sudo systemctl enable docker
+            echo "Stopping old container..."
+            sudo docker stop springboot-app || true
+            sudo docker rm springboot-app || true
 
-        echo "Stopping old container..."
-        sudo docker stop springboot-app || true
-        sudo docker rm springboot-app || true
+            echo "Loading new Docker image..."
+            sudo docker load -i /home/ec2-user/app.tar
 
-        echo "Loading new Docker image..."
-        sudo docker load -i app.tar
-
-        echo "Running new container..."
-         sudo docker run -d \
-        -p 8080:8080 \
-        --restart unless-stopped \
-        --name springboot-app \
-        springboot-tomcat-app
-
+            echo "Running new container..."
+            sudo docker run -d \
+              -p 8080:8080 \
+              --restart unless-stopped \
+              --name springboot
